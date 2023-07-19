@@ -62,7 +62,7 @@ def apply_err(mag, mag_table, err_table, factor_error):
 
 
 
-def faker_bin(total_bin, IMF_author, file_in, dist):
+def faker_bin(N_stars_cmd, file_in, dist):
     """Calculates the fraction of binaries in the simulated clusters.
 
     Parameters
@@ -89,59 +89,32 @@ def faker_bin(total_bin, IMF_author, file_in, dist):
 
     mass, int_IMF, mag1, mag2 = np.loadtxt(file_in, usecols=(3, 4, 29, 30), unpack=True)
 
-    # bin in mass (solar masses)
-    binmass = 5.0e-4
+    cond = mag1 <= mmax + 0.2
+    mass, mag1, mag2, int_IMF = mass[cond], mag1[cond], mag2[cond], int_IMF[cond]
 
     mag1 += 5 * np.log10(dist) - 5
     mag2 += 5 * np.log10(dist) - 5
 
-    IMF = IMF_(IMF_author)
+    n_stars = [i-j for i,j in zip(int_IMF[0:-1],int_IMF[1::])]
+    n_stars.append(int_IMF[-2]-int_IMF[-1])
+    n_stars /= mass
+    sum1_stars = np.sum(n_stars[::-1])
+    # Normalizing n_stars_cmd
+    n_stars *= 50 * N_stars_cmd / sum1_stars
+    # Creating an array of integers to simulate stars
+    n_stars_int = [int(round(i)) for i in n_stars]
+    total_stars_int = np.sum(n_stars_int)
 
-    # amostra is an array with the amount of stars in each bin of mass. ex.: [2,3,4,1,2]
-    massmin = np.min(mass)
-    massmax = np.max(mass)
-    bins_mass = int((massmax - massmin) / binmass)
-    amostra = np.zeros(bins_mass)
-
-    for i in range(bins_mass):
-        if (i * binmass) + massmin <= IMF["IMF_mass_break"]:
-            amostra[i] = round((massmin + i * binmass) ** (IMF["IMF_alpha_1"]))
-        else:
-            amostra[i] = round((massmin + i * binmass) ** (IMF["IMF_alpha_2"]))
-    # Soma is the total amount of stars (float), the sum of amostra
-    soma = np.sum(amostra)
-    # Now normalizing the array amostra
-    # for idx, num in enumerate(amostra):
-    amostra = np.multiply(amostra, total_bin / soma)
-
-    massa_calculada = np.zeros(int(total_bin))
-
+    binaries = np.zeros((np.sum(n_stars_int), 3))
     count = 0
+    for i,j in enumerate(n_stars_int):
+        if j > 0:
+            intervalo = np.random.rand(j)
+            binaries[count:count+j, 0] = mag1[i] - (mag1[i] - mag1[i + 1]) * intervalo
+            binaries[count:count+j, 1] = mag2[i] - (mag2[i] - mag2[i + 1]) * intervalo
+            binaries[count:count+j, 2] = mass[i] - (mass[i] - mass[i + 1]) * intervalo
+            count += j
 
-    for j in range(bins_mass):  # todos os intervalos primarios de massa
-        for k in range(
-            int(amostra[j])
-        ):  # amostra() eh a amostra de estrelas dentro do intervalo de massa
-            massa_calculada[count] = (
-                massmin + (j * binmass) + (k * binmass / amostra[j])
-            )
-            # massa calculada eh a massa de cada estrela
-            count += 1
-
-    # mag1 mag1err unc1 mag2 mag2err unc2
-    binaries = np.zeros((total_bin, 3))
-
-    for i in range(total_bin):
-        for k in range(len(mass) - 1):  # abre as linhas do arquivo em massa
-            # se a massa estiver no intervalo das linhas
-            if (mass[k] < massa_calculada[i]) & (mass[k + 1] > massa_calculada[i]):
-                # vai abrir tantas vezes quantas forem as estrelas representadas
-                intervalo = (massa_calculada[i] - mass[k]) / (
-                    mass[k + 1] - mass[k]
-                )  # intervalo entre zero e um
-                binaries[i, 0] = mag1[k] - (mag1[k] - mag1[k + 1]) * intervalo
-                binaries[i, 1] = mag2[k] - (mag2[k] - mag2[k + 1]) * intervalo
-                binaries[i, 2] = massa_calculada[i]
     return binaries[:, 0], binaries[:, 1], binaries[:, 2]
 
 
@@ -246,74 +219,42 @@ def faker(N_stars_cmd, frac_bin, IMF_author,
     file_iso = 'bank/age_{:.2f}_Gyr_MH_{:.2f}.dat'.format(age, FeH)
     mass, int_IMF, mag1, mag2 = np.loadtxt(file_iso, usecols=(3, 4, 29, 30), unpack=True)
 
-    # bin in mass (solar masses)
-    binmass = 5.0e-4
+    cond = mag1 <= mmax + 0.2
+    mass, mag1, mag2, int_IMF = mass[cond], mag1[cond], mag2[cond], int_IMF[cond]
 
     mag1 += 5 * np.log10(dist) - 5
     mag2 += 5 * np.log10(dist) - 5
 
-    # Warning: cut in mass to avoid faint stars with high errors showing up in the
-    # bright part of magnitude. The mass is not the total mass of the cluster,
-    # only a lower limit for the total mass.
-    cond = mag1 <= mmax + 0.2
-    mass, mag1, mag2, int_IMF = mass[cond], mag1[cond], mag2[cond], int_IMF[cond]
+    # for j, (radius_min, radius_max) in enumerate(zip(rlim[0:-1], rlim[1:])):
+    n_stars = [i-j for i,j in zip(int_IMF[0:-1],int_IMF[1::])]
+    n_stars.append(int_IMF[-2]-int_IMF[-1])
+    n_stars /= mass
+    sum1_stars = np.sum(n_stars[::-1])
+    # Normalizing n_stars_cmd
+    n_stars *= 50 * N_stars_cmd / sum1_stars
+    # Creating an array of integers to simulate stars
+    n_stars_int = [int(round(i)) for i in n_stars]
+    total_stars_int = np.sum(n_stars_int)
 
-    # amostra is an array with the amount of stars in each bin of mass. ex.: [2,3,4,1,2]
-    massmin = np.min(mass)
-    massmax = np.max(mass)
-    bins_mass = int((massmax - massmin) / binmass)
-    n_stars = int_IMF
-    amostra = np.zeros(bins_mass)
-
-    IMF = IMF_(IMF_author)
-
-    for i in range(bins_mass):
-        if (i * binmass) + massmin <= IMF["IMF_mass_break"]:
-            amostra[i] = round((massmin + i * binmass) ** (IMF["IMF_alpha_1"]))
-        else:
-            amostra[i] = round((massmin + i * binmass) ** (IMF["IMF_alpha_2"]))
-    # Soma is the total amount of stars (float), the sum of amostra
-    soma = np.sum(amostra)
-
-    # Now normalizing the array amostra
-    for i in range(len(amostra)):
-        amostra[i] = N_stars_cmd * amostra[i] / soma
-    massa_calculada = np.zeros((N_stars_cmd))
-
-    count = 0
-
-    if np.sum([int(i) for i in amostra]) > 0:
-        for j in range(bins_mass):  # todos os intervalos primarios de massa
-            for k in range(int(amostra[j])
-            ):  # amostra() eh a amostra de estrelas dentro do intervalo de massa
-                massa_calculada[count] = (
-                    massmin + (j * binmass) + (k * binmass / amostra[j])
-                )
-                # massa calculada eh a massa de cada estrela
-                count += 1
-
+    if total_stars_int > 0:
         # 0-RA, 1-DEC, 2-mag1, 3-mag1err, 4-unc1, 5-mag2, 6-mag2err, 7-unc2, 8-mass
-        star = np.zeros((N_stars_cmd, 9))
-
-        for i in range(N_stars_cmd):
-            for k in range(len(mass)-1):  # abre as linhas do arquivo em massa
-                # se a massa estiver no intervalo das linhas
-                if (mass[k] < massa_calculada[i]) & (mass[k + 1] > massa_calculada[i]):
-                    # vai abrir tantas vezes quantas forem as estrelas representadas
-                    intervalo = (massa_calculada[i] - mass[k]) / (
-                        mass[k + 1] - mass[k]
-                    )  # intervalo entre zero e um
-                    star[i, 2] = mag1[k] - (mag1[k] - mag1[k + 1]) * intervalo
-                    star[i, 5] = mag2[k] - (mag2[k] - mag2[k + 1]) * intervalo
-                    star[i, 8] = massa_calculada[i]
+        star = np.zeros((np.sum(n_stars_int), 9))
+        count = 0
+        for i,j in enumerate(n_stars_int):
+            if j > 0:
+                intervalo = np.random.rand(j)
+                star[count:count+j, 2] = mag1[i] - (mag1[i] - mag1[i + 1]) * intervalo
+                star[count:count+j, 5] = mag2[i] - (mag2[i] - mag2[i + 1]) * intervalo
+                star[count:count+j, 8] = mass[i] - (mass[i] - mass[i + 1]) * intervalo
+                count += j
 
         # apply binarity
         # definition of binarity: fb = N_stars_in_binaries / N_total
-        N_stars_bin = int(N_stars_cmd / ((2.0 / frac_bin) - 1))
+        N_stars_bin = int(np.sum(n_stars_int) / ((2.0 / frac_bin) - 1))
         mag1_bin, mag2_bin, mass_bin = faker_bin(
-            N_stars_bin, "Kroupa", file_iso, dist)
+            N_stars_bin, file_iso, dist)
 
-        j = np.random.randint(N_stars_cmd, size=N_stars_bin)
+        j = np.random.randint(np.sum(n_stars_int), size=N_stars_bin)
         k = np.random.randint(N_stars_bin, size=N_stars_bin)
 
         for j, k in zip(j, k):
@@ -336,6 +277,10 @@ def faker(N_stars_cmd, frac_bin, IMF_author,
 
         h1, xedges, yedges, im1 = plt.hist2d(cor, mmag, bins=(c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
+        #plt.imshow(h1.T, aspect='auto')
+        #plt.colorbar()
+        #plt.title('N_stars_cmd {:d}, total_stars_int {:d}, np.sum(h1) {:.2f})'.format(N_stars_cmd, total_stars_int, np.sum(h1)))
+        #plt.show()
         return h1
     else:
         return np.zeros((c_steps, m_steps))
@@ -387,6 +332,7 @@ def CSP_real_data(cmin, cmax, mmin, mmax, c_steps, m_steps, data_g, data_r):
 
 def ln_prior(theta):
     distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r = theta
+
     if 0.1 < distance < 300 and 0.01 < total_stars < 1000 and 0.0 < binarity < 1.0 and 0.0 < peak_age < 20.0 and 0.0 <  std_age < 3.0 and -10.0 <  peak_FeH < 1.0 and 0.0 <  std_FeH  < 1.0 and 0.0 < factor_error_g < 10.0 and 0.0 < factor_error_r < 10.0 and 0.0 < comp_g < 100.0 and 0.0 < comp_r < 100.0 and 0.0 < comp_mag_g < 100.0 and 0.0 < comp_mag_r < 100.0:
         return 0.0
     return -np.inf
@@ -440,7 +386,7 @@ mag1_, err1_, err2_ = np.loadtxt('/home/adriano/ga_sim/surveys/des/errors.dat', 
 
 ndim, nwalkers = 13, 30
 # fitting pars: distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r
-kick = [30, 0.5, 0.5, 12., 1., -1.5, 0.2, 1., 1., 0.9, 0.9, 23, 23]
+kick = [30, 0.1, 0.5, 12., 1., -1.5, 0.2, 1., 1., 0.9, 0.9, 23, 23]
 pos = [kick + 1e-4*np.random.randn(ndim) for j in range(nwalkers)]
 
 sampler = emcee.EnsembleSampler(
