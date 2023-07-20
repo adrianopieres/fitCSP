@@ -66,11 +66,17 @@ def faker_bin(N_stars_cmd, file_in, dist):
     mass, int_IMF, mag1, mag2 = np.loadtxt(
         file_in, usecols=(3, 4, 29, 30), unpack=True)
 
-    cond = mag1 <= mmax + 0.2
-    mass, mag1, mag2, int_IMF = mass[cond], mag1[cond], mag2[cond], int_IMF[cond]
-
     mag1 += 5 * np.log10(dist) - 5
     mag2 += 5 * np.log10(dist) - 5
+
+    cond = mag1 <= mmax + 0.2
+
+    mass, mag1, mag2, int_IMF = mass[cond], mag1[cond], mag2[cond], int_IMF[cond]
+
+    mass = np.concatenate((mass, ([mass[-1]])))
+    mag1 = np.concatenate((mag1, ([mag1[-1]])))
+    mag2 = np.concatenate((mag2, ([mag2[-1]])))
+    int_IMF = np.concatenate((int_IMF, ([int_IMF[-1]])))
 
     n_stars = [i-j for i, j in zip(int_IMF[0:-1], int_IMF[1::])]
     n_stars.append(int_IMF[-2]-int_IMF[-1])
@@ -80,7 +86,6 @@ def faker_bin(N_stars_cmd, file_in, dist):
     n_stars *= 50 * N_stars_cmd / sum1_stars
     # Creating an array of integers to simulate stars
     n_stars_int = [int(round(i)) for i in n_stars]
-    total_stars_int = np.sum(n_stars_int)
 
     binaries = np.zeros((np.sum(n_stars_int), 3))
     count = 0
@@ -198,11 +203,16 @@ def faker(N_stars_cmd, frac_bin,
     mass, int_IMF, mag1, mag2 = np.loadtxt(
         file_iso, usecols=(3, 4, 29, 30), unpack=True)
 
+    mag1 += 5 * np.log10(dist) - 5
+    mag2 += 5 * np.log10(dist) - 5
+
     cond = mag1 <= mmax + 0.2
     mass, mag1, mag2, int_IMF = mass[cond], mag1[cond], mag2[cond], int_IMF[cond]
 
-    mag1 += 5 * np.log10(dist) - 5
-    mag2 += 5 * np.log10(dist) - 5
+    mass = np.concatenate((mass, ([mass[-1]])))
+    mag1 = np.concatenate((mag1, ([mag1[-1]])))
+    mag2 = np.concatenate((mag2, ([mag2[-1]])))
+    int_IMF = np.concatenate((int_IMF, ([int_IMF[-1]])))
 
     # for j, (radius_min, radius_max) in enumerate(zip(rlim[0:-1], rlim[1:])):
     n_stars = [i-j for i, j in zip(int_IMF[0:-1], int_IMF[1::])]
@@ -257,7 +267,7 @@ def faker(N_stars_cmd, frac_bin,
         cor = star[:, 2] + star[:, 3] - (star[:, 5] + star[:, 6])
         mmag = star[:, 2] + star[:, 3]
 
-        h1, xedges, yedges, im1 = plt.hist2d(cor, mmag, bins=(
+        h1, xedges, yedges = np.histogram2d(cor, mmag, bins=(
             c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
         #plt.imshow(h1.T, aspect='auto')
@@ -288,7 +298,7 @@ def CSP(pars):
     age_bins = np.linspace(age_min, age_max, num_age, endpoint=True)
     FeH_bins = np.linspace(FeH_min, FeH_max, num_FeH, endpoint=True)
 
-    h1, xedges, yedges, im1 = plt.hist2d(x, y, bins=(
+    h1, xedges, yedges = np.histogram2d(x, y, bins=(
         age_bins, FeH_bins), range=[[cmin, cmax], [mmin, mmax]])
 
     job_CMDs = []
@@ -310,7 +320,7 @@ def CSP_real_data(cmin, cmax, mmin, mmax, c_steps, m_steps, data_g, data_r):
 
     cor = data_g - data_r
 
-    h1, xedges, yedges, im1 = plt.hist2d(cor, data_g, bins=(
+    h1, xedges, yedges = np.histogram2d(cor, data_g, bins=(
         c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
     return h1
