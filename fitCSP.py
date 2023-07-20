@@ -16,6 +16,7 @@ from parsl import python_app, join_app
 parsl.load()
 # from fitCSP import (apply_err, faker_bin, unc, faker, CSP, CSP_real_data, ln_prior, ln_like, ln_prob)
 
+
 def apply_err(mag, mag_table, err_table, factor_error):
     """This function returns magnitude errors for the 'mag' variable
     based on mag_table and err_table.
@@ -83,7 +84,7 @@ def faker_bin(N_stars_cmd, file_in, dist):
     n_stars /= mass
     sum1_stars = np.sum(n_stars[::-1])
     # Normalizing n_stars_cmd
-    n_stars *= 50 * N_stars_cmd / sum1_stars
+    n_stars *= 4 * N_stars_cmd / sum1_stars
     # Creating an array of integers to simulate stars
     n_stars_int = [int(round(i)) for i in n_stars]
 
@@ -124,6 +125,7 @@ def unc(mag, mag_table, err_table):
 
     err_interp = np.interp(mag, mag_table, err_table)
     return err_interp
+
 
 @python_app
 def faker(N_stars_cmd, frac_bin,
@@ -220,7 +222,7 @@ def faker(N_stars_cmd, frac_bin,
     n_stars /= mass
     sum1_stars = np.sum(n_stars[::-1])
     # Normalizing n_stars_cmd
-    n_stars *= 50 * N_stars_cmd / sum1_stars
+    n_stars *= N_stars_cmd / sum1_stars
     # Creating an array of integers to simulate stars
     n_stars_int = [int(round(i)) for i in n_stars]
     total_stars_int = np.sum(n_stars_int)
@@ -246,15 +248,15 @@ def faker(N_stars_cmd, frac_bin,
         mag1_bin, mag2_bin, mass_bin = faker_bin(
             N_stars_bin, file_iso, dist)
 
-        j = np.random.randint(np.sum(n_stars_int), size=N_stars_bin)
+        j = np.random.randint(total_stars_int, size=N_stars_bin)
         k = np.random.randint(N_stars_bin, size=N_stars_bin)
 
-        for j, k in zip(j, k):
-            star[j, 2] = -2.5 * np.log10(
-                10.0 ** (-0.4 * star[j, 2]) + 10.0 ** (-0.4 * mag1_bin[k])
+        for jj, kk in zip(j, k):
+            star[jj, 2] = -2.5 * np.log10(
+                10.0 ** (-0.4 * star[jj, 2]) + 10.0 ** (-0.4 * mag1_bin[kk])
             )
-            star[j, 5] = -2.5 * np.log10(
-                10.0 ** (-0.4 * star[j, 5]) + 10.0 ** (-0.4 * mag2_bin[k])
+            star[jj, 5] = -2.5 * np.log10(
+                10.0 ** (-0.4 * star[jj, 5]) + 10.0 ** (-0.4 * mag2_bin[kk])
             )
 
         # print(star[:,8])
@@ -270,15 +272,16 @@ def faker(N_stars_cmd, frac_bin,
         h1, xedges, yedges = np.histogram2d(cor, mmag, bins=(
             c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
-        #plt.imshow(h1.T, aspect='auto')
+        # plt.imshow(h1.T, aspect='auto')
         # plt.colorbar()
-        #plt.title('N_stars_cmd {:d}, total_stars_int {:d}, np.sum(h1) {:.2f})'.format(N_stars_cmd, total_stars_int, np.sum(h1)))
-        # plt.show()
+        # plt.title('N_stars_cmd {:d}, total_stars_int {:d}, np.sum(h1) {:.2f})'.format(N_stars_cmd, total_stars_int, np.sum(h1)))
+        # plt.savefig('test.png')
+        # plt.close()
         return h1
     else:
         return np.zeros((c_steps, m_steps))
 
-# @join_app
+
 def CSP(pars):
 
     distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r = pars
@@ -302,16 +305,17 @@ def CSP(pars):
         age_bins, FeH_bins), range=[[cmin, cmax], [mmin, mmax]])
 
     job_CMDs = []
-    main_CSP = np.array([]) #np.zeros((len(xedges), len(yedges), c_steps, m_steps))
+    # np.zeros((len(xedges), len(yedges), c_steps, m_steps))
+    main_CSP = np.array([])
 
     for i, ii in enumerate(xedges[:-1]):
         for j, jj in enumerate(yedges[:-1]):
             if int(h1[i, j]) >= 1.:
                 job_CMDs.append(faker(int(h1[i, j]), binarity,
-                                   distance, cmin, cmax, mmin, mmax, mag1_, err1_, err2_, ii, jj, c_steps, m_steps, factor_error_g, factor_error_r))
+                                      distance, cmin, cmax, mmin, mmax, mag1_, err1_, err2_, ii, jj, c_steps, m_steps, factor_error_g, factor_error_r))
 
     for i in job_CMDs:
-        main_CSP =+ i.result()
+        main_CSP = + i.result()
 
     return main_CSP
 
@@ -320,7 +324,7 @@ def CSP_real_data(cmin, cmax, mmin, mmax, c_steps, m_steps, data_g, data_r):
 
     cor = data_g - data_r
 
-    h1, xedges, yedges = np.histogram2d(cor, data_g, bins=(
+    h1, xedges, yedges, im1 = plt.hist2d(cor, data_g, bins=(
         c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
     return h1
@@ -357,6 +361,7 @@ def ln_prob(theta):
     val = ln_like(theta)
     print(val)
     return lp + val
+
 
 cmin = -0.4
 cmax = 1.5
