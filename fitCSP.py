@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-import matplotlib.path as mpath
 import numpy as np
 import glob
 import astropy.io.fits as fits
@@ -324,7 +323,7 @@ def CSP_real_data(cmin, cmax, mmin, mmax, c_steps, m_steps, data_g, data_r):
 
     cor = data_g - data_r
 
-    h1, xedges, yedges, im1 = plt.hist2d(cor, data_g, bins=(
+    h1, xedges, yedges = np.histogram2d(cor, data_g, bins=(
         c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
     return h1
@@ -377,7 +376,7 @@ age_step = 0.2
 FeH_step = 0.05
 
 hdu = fits.open(
-    '/home/adriano/Dropbox/ga-wazpy/stack_cmd/Sculptor.fits', memmap=True)
+    '/lustre/t1/cl/lsst/gawa_project/adriano.pieres/fitCSP/Sculptor.fits', memmap=True)
 g_obj = hdu[1].data.field('BDF_MAG_G_CORRECTED')
 r_obj = hdu[1].data.field('BDF_MAG_R_CORRECTED')
 
@@ -385,7 +384,7 @@ CMD_real = CSP_real_data(cmin, cmax, mmin, mmax,
                          c_steps, m_steps, g_obj, r_obj)
 
 mag1_, err1_, err2_ = np.loadtxt(
-    '/home/adriano/ga_sim/surveys/des/errors.dat', usecols=(0, 1, 2), unpack=True)
+    '/lustre/t1/cl/lsst/gawa_project/adriano.pieres/ga_sim/surveys/des/errors.dat', usecols=(0, 1, 2), unpack=True)
 
 ndim, nwalkers = 13, 30
 # fitting pars: distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r
