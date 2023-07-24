@@ -244,21 +244,21 @@ def faker(N_stars_cmd, frac_bin,
         # apply binarity
         # definition of binarity: fb = N_stars_in_binaries / N_total
         N_stars_bin = int(np.sum(n_stars_int) / ((2.0 / frac_bin) - 1))
-        mag1_bin, mag2_bin, mass_bin = faker_bin(
-            N_stars_bin, file_iso, dist)
+        if N_stars_bin > 1:
+            mag1_bin, mag2_bin, mass_bin = faker_bin(
+                N_stars_bin, file_iso, dist)
 
-        j = np.random.randint(total_stars_int, size=N_stars_bin)
-        k = np.random.randint(N_stars_bin, size=N_stars_bin)
+            j = np.random.randint(total_stars_int, size=N_stars_bin)
+            k = np.random.randint(N_stars_bin, size=N_stars_bin)
 
-        for jj, kk in zip(j, k):
-            star[jj, 2] = -2.5 * np.log10(
-                10.0 ** (-0.4 * star[jj, 2]) + 10.0 ** (-0.4 * mag1_bin[kk])
+            for jj, kk in zip(j, k):
+                star[jj, 2] = -2.5 * np.log10(
+                    10.0 ** (-0.4 * star[jj, 2]) + 10.0 ** (-0.4 * mag1_bin[kk])
+                )
+                star[jj, 5] = -2.5 * np.log10(
+                    10.0 ** (-0.4 * star[jj, 5]) + 10.0 ** (-0.4 * mag2_bin[kk])
             )
-            star[jj, 5] = -2.5 * np.log10(
-                10.0 ** (-0.4 * star[jj, 5]) + 10.0 ** (-0.4 * mag2_bin[kk])
-            )
 
-        # print(star[:,8])
         star[:, 3] = apply_err(star[:, 2], mag1_, err1_, factor_error_g)
         star[:, 6] = apply_err(star[:, 5], mag1_, err2_, factor_error_r)
 
@@ -316,6 +316,12 @@ def CSP(pars):
     for i in job_CMDs:
         main_CSP = + i.result()
 
+    plt.imshow(main_CSP.T, aspect='auto')
+    plt.colorbar()
+    # plt.title('N_stars_cmd {:d}, total_stars_int {:d}, np.sum(h1) {:.2f})'.format(N_stars_cmd, total_stars_int, np.sum(h1)))
+    plt.savefig('CSP.png')
+    plt.close()
+    
     return main_CSP
 
 
@@ -326,13 +332,18 @@ def CSP_real_data(cmin, cmax, mmin, mmax, c_steps, m_steps, data_g, data_r):
     h1, xedges, yedges = np.histogram2d(cor, data_g, bins=(
         c_steps, m_steps), range=[[cmin, cmax], [mmin, mmax]])
 
+    plt.imshow(h1.T, aspect='auto')
+    plt.colorbar()
+    # plt.title('N_stars_cmd {:d}, total_stars_int {:d}, np.sum(h1) {:.2f})'.format(N_stars_cmd, total_stars_int, np.sum(h1)))
+    plt.savefig('CSP_real_data.png')
+    plt.close()
     return h1
 
 
 def ln_prior(theta):
     distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r = theta
 
-    if 0.1 < distance < 300 and 0.01 < total_stars < 1000 and 0.0 < binarity < 1.0 and 0.0 < peak_age < 20.0 and 0.0 < std_age < 3.0 and -10.0 < peak_FeH < 1.0 and 0.0 < std_FeH < 1.0 and 0.0 < factor_error_g < 10.0 and 0.0 < factor_error_r < 10.0 and 0.0 < comp_g < 100.0 and 0.0 < comp_r < 100.0 and 0.0 < comp_mag_g < 100.0 and 0.0 < comp_mag_r < 100.0:
+    if 85. < distance < 100 and 1.00 < total_stars < 100 and 0.0 < binarity < 1.0 and 0.0 < peak_age < 20.0 and 0.0 < std_age < 3.0 and -10.0 < peak_FeH < 1.0 and 0.0 < std_FeH < 1.0 and 0.0 < factor_error_g < 10.0 and 0.0 < factor_error_r < 10.0 and 0.0 < comp_g < 100.0 and 0.0 < comp_r < 100.0 and 0.0 < comp_mag_g < 100.0 and 0.0 < comp_mag_r < 100.0:
         return 0.0
     return -np.inf
 
@@ -345,11 +356,12 @@ def ln_like(theta):
     mod = np.ma.array(mod)
     obs = np.ma.array(CMD_real)
     valid = (mod > 0.) & (obs > 0.)
-    l = (mod[valid] - obs[valid] + obs[valid] *
+    l = -(mod[valid] - obs[valid] + obs[valid] *
          np.log(obs[valid] / mod[valid])) * (2.0)
     if len(l) == 0:
-        l = np.array([[np.inf, 0], [0, 0]])
+        l = np.array([[-np.inf, 0], [0, 0]])
         return l.sum()
+    print('l == ', l.sum())
     return l.sum()
 
 
@@ -358,7 +370,6 @@ def ln_prob(theta):
     if not np.isfinite(lp):
         return -np.inf
     val = ln_like(theta)
-    print(val)
     return lp + val
 
 
@@ -386,15 +397,15 @@ CMD_real = CSP_real_data(cmin, cmax, mmin, mmax,
 mag1_, err1_, err2_ = np.loadtxt(
     '/lustre/t1/cl/lsst/gawa_project/adriano.pieres/ga_sim/surveys/des/errors.dat', usecols=(0, 1, 2), unpack=True)
 
-ndim, nwalkers = 13, 30
+ndim, nwalkers = 13, 100
 # fitting pars: distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r
-kick = [30, 0.1, 0.5, 12., 1., -1.5, 0.2, 1., 1., 0.9, 0.9, 23, 23]
-pos = [kick + 1e-4*np.random.randn(ndim) for j in range(nwalkers)]
+kick = [90.3, 20.0, 0.6, 13.0, 1.2, -2.0, 0.2, 1., 1., 0.9, 0.9, 23, 23]
+pos = [kick + 5e-3*np.random.randn(ndim) for j in range(nwalkers)]
 
 sampler = emcee.EnsembleSampler(
     nwalkers, ndim, ln_prob, args=())
 
-sampler.run_mcmc(pos, 10)
+sampler.run_mcmc(pos, 100)
 
 fig, axes = plt.subplots(ndim, figsize=(30, 7), sharex=True)
 
@@ -413,7 +424,7 @@ axes[-1].set_xlabel("step number");
 '''
 distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH, factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r = map(
     lambda v: (v[1], v[2]-v[1], v[1]-v[0]), zip(*np.percentile(samples, [16, 50, 84], axis=0)))
-print(distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH,
+print('results == ', distance, total_stars, binarity, peak_age, std_age, peak_FeH, std_FeH,
       factor_error_g, factor_error_r, comp_g, comp_r, comp_mag_g, comp_mag_r)
 # Plotting data
 fig = corner.corner(samples, labels=labels, truths=[distance[0], total_stars[0], binarity[0], peak_age[0], std_age[0], peak_FeH[0], std_FeH[0], factor_error_g[0],
